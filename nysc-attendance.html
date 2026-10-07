@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NYSC CDS Attendance</title>
+<style>
+/* Layout: the PCM dashboard as shipped — one centred 640px column, floating pill nav, alerts button bottom-right. */
+:root {
+  /* Sampled from the live PCM dashboard */
+  --bg: #f1f9f5;
+  --card: #ffffff;
+  --fg: #172620;
+  --muted: #5a7268;
+  --border: #d9e8e1;
+  --primary: #1b7e53;
+  --primary-fg: #ffffff;
+  --soft: #e8f2ed;
+  --soft-fg: #1b7e53;
+  --warn: #d17c2c;
+  --warn-soft: #fdf3e6;
+  --danger: #dd2c2c;
+  --danger-soft: #fdeaea;
+  --nav: rgb(255 255 255 / .85);
+  --pill: #f1f6f4;
+  --pill-fg: #3e7a5a;
+  --ok-dot: #45b883;
+  --shadow: 0 8px 32px rgb(36 66 53 / .06);
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--font); }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+p { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+
+.page { max-width: 640px; margin: 0 auto; padding: 16px 16px 140px; display: flex; flex-direction: column; gap: 22px; }
+
+/* Demo strip (preview only) */
+.demo { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); border: 1px dashed var(--border); border-radius: 12px; padding: 8px 10px; }
+.demo b { font-weight: 600; margin-right: 4px; }
+.demo button { border: 1px solid var(--border); background: var(--card); border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+.demo button[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+
+/* Header */
+.head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.head .hello { color: var(--muted); font-size: 15px; }
+.editable { cursor: pointer; }
+.head h1 { font-size: 34px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
+.head .code { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.date-pill { display: inline-flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700; white-space: nowrap; flex: none; }
+.date-pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
+
+.sec-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
+.sec-head h2 { font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
+.icon-btn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); color: var(--primary); display: grid; place-items: center; flex: none; }
+.icon-btn svg { width: 17px; height: 17px; }
+.icon-btn.spin svg { animation: spin .7s linear; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#view { display: flex; flex-direction: column; gap: 26px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); }
+.pad { padding: 18px; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+
+.empty { padding: 48px 20px; display: grid; justify-items: center; gap: 14px; text-align: center; color: var(--muted); }
+.empty .ico { width: 56px; height: 56px; border-radius: 14px; background: var(--soft); color: var(--primary); display: grid; place-items: center; }
+.empty .ico svg { width: 26px; height: 26px; }
+.empty small { display: block; font-size: 13px; margin-top: -8px; }
+
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.chip.ok { background: var(--soft); color: var(--soft-fg); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.bad { background: var(--danger-soft); color: var(--danger); }
+.chip.plain { background: var(--bg); color: var(--muted); }
+
+.event-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.event-top h3 { font-size: 18px; font-weight: 800; }
+.meta { display: grid; gap: 6px; margin-top: 12px; font-size: 14px; color: var(--muted); }
+.meta div { display: flex; align-items: center; gap: 8px; }
+.meta svg { width: 16px; height: 16px; flex: none; color: var(--primary); }
+
+.btn { border: 1px solid var(--border); background: var(--card); border-radius: 12px; padding: 10px 16px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-fg); }
+.btn.block { width: 100%; padding: 13px; }
+.btn svg { width: 18px; height: 18px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+
+.steps { display: grid; gap: 10px; margin-top: 16px; }
+.step { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+.step .dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border); flex: none; display: grid; place-items: center; }
+.step.run .dot { border-color: var(--primary); border-top-color: transparent; animation: spin .8s linear infinite; }
+.step.done { color: var(--fg); }
+.step.done .dot { background: var(--primary); border-color: var(--primary); }
+.step.done .dot::after { content: ""; width: 8px; height: 4px; border-left: 2px solid var(--primary-fg); border-bottom: 2px solid var(--primary-fg); transform: rotate(-45deg) translate(1px, -1px); }
+
+/* Banners */
+.banner { border-radius: 16px; padding: 16px 18px; display: flex; gap: 14px; align-items: center; }
+.banner .bi { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: none; background: rgb(255 255 255 / .2); }
+.banner .bi svg { width: 22px; height: 22px; }
+.banner b { display: block; font-size: 17px; }
+.banner span { font-size: 14px; opacity: .92; }
+.banner.called { background: var(--primary); color: var(--primary-fg); box-shadow: 0 0 0 4px var(--soft); animation: nudge 1.4s ease-in-out 3; }
+.banner.cleared { background: var(--primary); color: var(--primary-fg); }
+@keyframes nudge { 50% { transform: scale(1.012); } }
+
+/* Ticket */
+.ticket-top { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; padding: 18px; }
+.big { font-size: 64px; font-weight: 800; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+.label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+canvas.qr { width: 104px; height: 104px; image-rendering: pixelated; background: #fff; padding: 5px; border-radius: 8px; border: 1px solid var(--border); }
+.perf { border-top: 2px dashed var(--border); margin: 0 16px; }
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; padding: 14px 18px 18px; margin: 0; font-size: 14px; }
+.facts dt { font-size: 12px; color: var(--muted); }
+.facts dd { margin: 0; font-weight: 600; }
+
+.qline { position: relative; height: 10px; border-radius: 999px; background: var(--soft); margin: 14px 0 6px; }
+.qfill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--primary); transition: width .5s; }
+.qme { position: absolute; top: 50%; width: 18px; height: 18px; border-radius: 50%; background: var(--fg); border: 3px solid var(--card); transform: translate(-50%, -50%); transition: left .5s; }
+.qscale { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+
+/* History */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stat { padding: 14px; }
+.stat b { display: block; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 13px; color: var(--muted); }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; font-size: 13px; }
+.cal .dow { font-size: 11px; font-weight: 700; color: var(--muted); padding-bottom: 4px; }
+.cal .d { aspect-ratio: 1; max-width: 100%; display: grid; place-items: center; border-radius: 10px; font-variant-numeric: tabular-nums; position: relative; }
+.cal .d.cds { font-weight: 700; }
+.cal .d.att { background: var(--primary); color: var(--primary-fg); }
+.cal .d.late { background: var(--warn-soft); color: var(--warn); }
+.cal .d.exc { background: var(--soft); color: var(--soft-fg); }
+.cal .d.abs { background: var(--danger-soft); color: var(--danger); }
+.cal .d.today { outline: 2px solid var(--primary); outline-offset: -2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.list > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 18px; border-bottom: 1px solid var(--border); }
+.list > div:last-child { border-bottom: 0; }
+.list small { display: block; font-size: 12px; color: var(--muted); }
+
+/* Games */
+.points { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.points b { font-size: 30px; font-weight: 800; }
+.game { display: flex; gap: 14px; align-items: center; padding: 16px 18px; }
+.game .gi { width: 48px; height: 48px; border-radius: 14px; background: var(--soft); color: var(--primary); display: grid; place-items: center; font-weight: 800; font-size: 15px; flex: none; }
+.game div { min-width: 0; flex: 1; }
+.game b { display: block; }
+
+/* Settings */
+.set > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.set > div:last-child { border-bottom: 0; }
+.toggle { appearance: none; width: 42px; height: 24px; border-radius: 999px; background: var(--border); position: relative; margin: 0; cursor: pointer; flex: none; transition: background .2s; }
+.toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / .25); transition: transform .2s; }
+.toggle:checked { background: var(--primary); }
+.toggle:checked::after { transform: translateX(18px); }
+
+/* Forms */
+.field { display: grid; gap: 6px; }
+.field label { font-size: 13px; font-weight: 600; }
+.field input, .field select, .field textarea { border: 1px solid var(--border); background: var(--bg); border-radius: 12px; padding: 10px 12px; width: 100%; }
+.field textarea { min-height: 84px; resize: vertical; }
+
+.ev { padding: 22px 18px 20px; display: flex; flex-direction: column; gap: 14px; border-radius: 20px; }
+.ev-title { font-size: 24px; font-weight: 800; letter-spacing: -.03em; line-height: 1.15; }
+.pills { display: flex; flex-wrap: wrap; gap: 10px; }
+.pill { display: inline-flex; align-items: center; gap: 9px; background: var(--pill); color: var(--pill-fg); border-radius: 999px; padding: 7px 13px; font-size: 14px; font-weight: 500; min-width: 0; max-width: 100%; }
+.pill svg { width: 16px; height: 16px; flex: none; }
+.pill.wide { flex: 1 1 100%; }
+.trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ev-rule { border: 0; border-top: 1px solid var(--border); margin: 4px 0 0; width: 100%; }
+.ev-status { display: flex; align-items: center; gap: 10px; }
+.ev-status b { font-size: 17px; font-weight: 600; flex: 1; white-space: nowrap; }
+.ev-status .chip { font-size: 13px; font-weight: 600; padding: 4px 12px; }
+.ev-status .chip::before { display: none; }
+.okdot { width: 22px; height: 22px; border-radius: 50%; background: var(--ok-dot); color: #fff; display: grid; place-items: center; flex: none; }
+.okdot svg { width: 14px; height: 14px; }
+.ev-num { text-align: center; }
+.ev-num .num { font-size: 46px; font-weight: 800; color: var(--primary); letter-spacing: -.03em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.ev-num p { font-size: 13px; margin-top: 2px; }
+.qr-box { align-self: center; width: min(100%, 268px); border: 0; border-radius: 18px; padding: 18px; display: grid; justify-items: center; gap: 10px; background: #fff; }
+.qr-box canvas.qr { background: none; width: 100%; height: auto; aspect-ratio: 1; padding: 0; border: 0; border-radius: 0; image-rendering: pixelated; }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+@media (max-width: 420px) { .ev { padding: 20px 18px 18px; } .pill { font-size: 13.5px; padding: 6px 12px; } }
+
+/* Bottom nav */
+.nav { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 14px); transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 7px; background: var(--nav); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 999px; box-shadow: var(--shadow); width: min(512px, calc(100% - 32px)); z-index: 20; }
+.nav button { border: 0; background: none; color: var(--muted); height: 40px; min-width: 44px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; font-size: 14px; position: relative; transition: flex .25s, background .2s; }
+.nav button svg { width: 20px; height: 20px; flex: none; }
+.nav button span { display: none; }
+.nav button[aria-current="page"] { flex: 1; background: var(--primary); color: var(--primary-fg); }
+.nav button[aria-current="page"] span { display: inline; }
+.nav button:not([aria-current="page"]):hover { color: var(--fg); background: var(--soft); }
+.nav .dotb { position: absolute; top: -2px; right: 2px; min-width: 18px; height: 18px; border-radius: 999px; background: var(--ok-dot); color: #fff; font-size: 11px; font-weight: 700; font-style: normal; display: grid; place-items: center; padding: 0 5px; }
+
+.fab { position: fixed; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--primary); color: var(--primary-fg); display: grid; place-items: center; box-shadow: 0 8px 24px rgb(27 126 83 / .3); z-index: 21; }
+.fab svg { width: 22px; height: 22px; }
+.fab .badge { position: absolute; top: -4px; right: -4px; min-width: 22px; height: 22px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 12px; font-weight: 800; display: grid; place-items: center; padding: 0 6px; border: 2px solid var(--bg); }
+@media (min-width: 760px) { .fab { bottom: 84px; right: 10px; } }
+
+/* Sheet */
+.scrim { position: fixed; inset: 0; background: rgb(8 20 14 / .45); z-index: 30; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--card); width: 100%; max-width: 560px; max-height: 86vh; overflow-y: auto; border-radius: 22px 22px 0 0; padding: 10px 18px calc(env(safe-area-inset-bottom, 0px) + 22px); display: flex; flex-direction: column; gap: 14px; animation: up .25s ease-out; }
+@keyframes up { from { transform: translateY(30px); opacity: 0; } }
+.grab { width: 40px; height: 4px; border-radius: 999px; background: var(--border); margin: 0 auto 4px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.sheet-head h3 { font-size: 19px; font-weight: 800; }
+.alert-item { border: 1px solid var(--border); border-radius: 14px; padding: 14px; display: grid; gap: 6px; }
+.alert-item .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.alert-item p { font-size: 14px; }
+.up { border: 1px solid var(--border); background: var(--bg); border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 700; justify-self: start; }
+.up[aria-pressed="true"] { background: var(--soft); color: var(--soft-fg); border-color: transparent; }
+
+.toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 14px); transform: translate(-50%, -20px); opacity: 0; visibility: hidden; pointer-events: none; width: min(440px, calc(100% - 32px)); background: var(--fg); color: var(--bg); border-radius: 14px; padding: 12px 16px; font-size: 14px; box-shadow: var(--shadow); z-index: 40; transition: transform .3s, opacity .3s, visibility .3s; }
+.toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; }
+.toast b { display: block; }
+
+@media (max-width: 420px) {
+  .head h1 { font-size: 28px; }
+  .big { font-size: 52px; }
+  canvas.qr { width: 88px; height: 88px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+
+</head>
+<body>
+<div class="page">
+
+  <header class="head">
+    <div>
+      <p class="hello" id="greet">Good afternoon,</p>
+      <h1 id="hName" class="editable" data-act="edit" role="button" tabindex="0" title="Tap to edit">Abdulbasit</h1>
+      <p class="code">State code: <span class="mono" id="hCode">LA/26B/2941</span></p>
+    </div>
+    <span class="date-pill" id="datePill">Wed, 7 Oct</span>
+  </header>
+
+  <main id="view"></main>
+</div>
+
+<button class="fab" id="fab" type="button" aria-label="Community updates, 5 new">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 15-6v14L3 13z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
+  <span class="badge" id="fabBadge">5</span>
+</button>
+
+<nav class="nav" aria-label="Main">
+  <button type="button" data-tab="home" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></button>
+  <button type="button" data-tab="history" aria-label="History"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg><span>History</span></button>
+  <button type="button" data-tab="games" aria-label="Games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="6"/><path d="M6 12h4M8 10v4M15 11h.01M18 13h.01"/></svg><span>Games</span></button>
+  <button type="button" data-tab="alerts" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span>Alerts</span><i class="dotb" id="notifDot">1</i></button>
+  <button type="button" data-tab="settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Settings</span></button>
+</nav>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="sheetRoot"></div>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const DEFAULTS = { name: "Abdulbasit", code: "LA/26B/2941", event: "B1 monthly clearance", time: "06:00 – 10:00", address: "1-7 Muri Okunola St, Victoria Island, Lagos", num: "731", checkinAt: "08:17", status: "Pending clearance" };
+  const D = Object.assign({}, DEFAULTS);
+  try { Object.assign(D, JSON.parse(localStorage.getItem("nysc-details") || "{}")); } catch (_) {}
+  const saveD = () => { try { localStorage.setItem("nysc-details", JSON.stringify(D)); } catch (_) {} };
+  const NOW = new Date();
+  const TODAY_SHORT = NOW.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  const TODAY_LONG = NOW.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }).replace(/^(\w+)\s/, "$1, ");
+
+  const I = {
+    cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.3-7-11a7 7 0 1 1 14 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
+    users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/></svg>',
+    refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 12A9 9 0 0 1 18.5 5.8L21 8"/><path d="M21 3v5h-5M3 21v-5h5"/></svg>',
+    scan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/></svg>',
+    hash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></svg>',
+    bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+    x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>'
+  };
+
+  /* state: none | open | checking | waiting | called | cleared */
+  const S = {
+    tab: "home", stage: "waiting", num: 731, checkinAt: "08:17",
+    clearing: { from: 651, to: 700 }, total: 812,
+    notifsRead: false, dark: null, push: true,
+    alerts: [
+      { tag: "Venue", hot: true, title: "Hall moved to Annex B", text: "LGA Secretariat main hall is being painted. Today's meeting holds in Annex B behind the car park.", by: "ICT Exco", ago: "25 min ago", up: 41, mine: false },
+      { tag: "Traffic", hot: false, title: "Gridlock on Obafemi Awolowo Way", text: "Allow an extra 30 minutes if coming from Allen roundabout.", by: "Corps member", ago: "1 h ago", up: 18, mine: false },
+      { tag: "Clearance", hot: false, title: "October clearance letters", text: "Monthly clearance letters will be signed at the zonal office from Friday 9 Oct.", by: "LGI office", ago: "Yesterday", up: 63, mine: false },
+      { tag: "Venue", hot: false, title: "Bring your own water", text: "The dispenser in the Annex is out of service.", by: "Corps member", ago: "Yesterday", up: 9, mine: false },
+      { tag: "Reminder", hot: false, title: "ID cards at clearance", text: "Excos will ask to see your NYSC ID card along with your attendance code.", by: "ICT Exco", ago: "2 days ago", up: 27, mine: false },
+      { tag: "Games", hot: false, title: "Friday X&O tournament", text: "Top 3 on the global leaderboard get a shout-out at the next meeting.", by: "ICT Exco", ago: "3 days ago", up: 12, mine: false }
+    ],
+    seenAlerts: false
+  };
+
+  /* ---------- helpers ---------- */
+  let tt;
+  function toast(title, body) {
+    const t = $("#toast");
+    t.innerHTML = `<b>${esc(title)}</b>${esc(body)}`;
+    t.classList.add("show");
+    clearTimeout(tt); tt = setTimeout(() => t.classList.remove("show"), 3600);
+  }
+  function drawCode(c, text) {
+    const n = 57, x = c.getContext("2d"); c.width = c.height = n + 2;
+    const ink = "#6b2541";
+    let h = 0; for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const r = () => (h = (h * 1103515245 + 12345) >>> 0) / 4294967296;
+    x.fillStyle = "#fff"; x.fillRect(0, 0, n + 2, n + 2); x.translate(1, 1); x.fillStyle = ink;
+    for (let y = 0; y < n; y++) for (let i = 0; i < n; i++) if (r() > .5) x.fillRect(i, y, 1, 1);
+    const sq = (a, b, s) => { x.fillStyle = "#fff"; x.fillRect(a - 1, b - 1, s + 2, s + 2); x.fillStyle = ink; x.fillRect(a, b, s, s); x.fillStyle = "#fff"; x.fillRect(a + 1, b + 1, s - 2, s - 2); x.fillStyle = ink; x.fillRect(a + 2, b + 2, s - 4, s - 4); };
+    sq(0, 0, 7); sq(n - 7, 0, 7); sq(0, n - 7, 7);
+    const al = (a, b) => { x.fillStyle = ink; x.fillRect(a, b, 5, 5); x.fillStyle = "#fff"; x.fillRect(a + 1, b + 1, 3, 3); x.fillStyle = ink; x.fillRect(a + 2, b + 2, 1, 1); };
+    const P = [6, 28, 50]; P.forEach(a => P.forEach(b => { if (!((a === 6 && b === 6) || (a === 50 && b === 6) || (a === 6 && b === 50))) al(a - 2, b - 2); }));
+    for (let i = 8; i < n - 8; i++) { x.fillStyle = i % 2 ? "#fff" : ink; x.fillRect(i, 6, 1, 1); x.fillRect(6, i, 1, 1); }
+  }
+
+  /* ---------- Home ---------- */
+  function eventCard() {
+    const status = {
+      waiting: `<span class="chip warn">${esc(D.status)}</span>`,
+      called: '<span class="chip warn">Your number is called</span>',
+      cleared: '<span class="chip ok">Cleared</span>'
+    }[S.stage];
+    let html = `<article class="card ev">
+      <h3 class="ev-title">${esc(D.event)}</h3>
+      <div class="pills">
+        <span class="pill">${I.clock}<span style="font-variant-numeric:tabular-nums">${esc(D.time)}</span></span>
+        <span class="pill">${I.cal}${TODAY_SHORT}</span>
+        <span class="pill wide">${I.pin}<span class="trunc">${esc(D.address)}</span></span>
+      </div>`;
+    if (S.stage === "open") {
+      html += `<hr class="ev-rule">
+        <div class="row2">
+          <button class="btn primary" type="button" data-act="checkin">${I.scan}Scan to check in</button>
+          <button class="btn" type="button" data-act="checkin">${I.hash}Enter event ID</button>
+        </div>
+        <p class="small muted" style="margin-top:10px">Be within 30 m of the venue. You can check in once per day.</p>`;
+    } else if (S.stage === "checking") {
+      html += `<hr class="ev-rule"><div class="steps">
+          <div class="step" data-s="0"><span class="dot"></span>Confirming you're at the venue</div>
+          <div class="step" data-s="1"><span class="dot"></span>Verifying this device</div>
+          <div class="step" data-s="2"><span class="dot"></span>Getting your attendance number</div>
+        </div>`;
+    } else {
+      html += `<hr class="ev-rule">
+        <div class="ev-status"><span class="okdot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg></span><b>Checked in</b>${status}</div>
+        <div class="ev-num"><div class="num">#${esc(D.num)}</div><p class="muted">Checked in at ${esc(D.checkinAt)}</p></div>
+        <div class="qr-box"><canvas class="qr" id="qr" role="img" aria-label="Clearance QR code for ${esc(D.code)}"></canvas></div>`;
+    }
+    return html + `</article>`;
+  }
+
+  function ticket() {
+    if (S.stage === "cleared") return "";
+    const ahead = Math.max(0, S.num - S.clearing.to - 1);
+    const max = S.total;
+    const called = S.stage === "called";
+    return `<article class="card pad">
+        <div class="event-top">
+          <div><p class="label">Clearance queue</p><b>Now clearing ${S.clearing.from}–${S.clearing.to}</b></div>
+          <span class="chip ${called ? "warn" : "plain"}">${called ? "Your turn" : `${ahead} ahead of you`}</span>
+        </div>
+        <div class="qline" aria-hidden="true">
+          <div class="qfill" style="width:${Math.min(100, S.clearing.to / max * 100)}%"></div>
+          <div class="qme" style="left:${Math.min(100, S.num / max * 100)}%"></div>
+        </div>
+        <div class="qscale"><span>1</span><span>You · ${S.num}</span><span>${max}</span></div>
+        <p class="small muted" style="margin-top:10px">${called ? "Go to the clearance desk now. If you miss this call, your Exco can call your range again." : "We'll notify you when your number is called. You can wait in the convene area."}</p>
+      </article>`;
+  }
+
+  function home() {
+    let html = "";
+    if (S.stage === "called") html += `<div class="banner called" role="alert"><div class="bi">${I.bell}</div><div><b>Your number has been called</b><span>Numbers ${S.clearing.from}–${S.clearing.to} are being cleared. Go to the clearance desk now.</span></div></div>`;
+    if (S.stage === "cleared") html += `<div class="banner cleared"><div class="bi">${I.check}</div><div><b>You're cleared for today</b><span>Attendance recorded at 09:02. You can leave the venue.</span></div></div>`;
+
+    html += `<section><div class="sec-head"><h2>Today's events</h2><button class="icon-btn" type="button" data-act="refresh" aria-label="Refresh events">${I.refresh}</button></div>`;
+    if (S.stage === "none") {
+      html += `<div class="card empty"><div class="ico">${I.cal}</div><p>No events scheduled for today</p><small>Your next CDS meeting is <b>Wed, 14 Oct</b> at 1:00 PM.</small></div>`;
+    } else {
+      html += `<div class="stack">${eventCard()}</div>`;
+    }
+    html += `</section>`;
+
+
+    return html;
+  }
+
+  /* ---------- History ---------- */
+  function history() {
+    const marks = { 2: "att", 9: "late", 16: "exc", 23: "att", 30: "att" };
+    // September 2026 starts on a Tuesday
+    const dows = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+    let cells = dows.map(d => `<div class="dow">${d}</div>`).join("") + `<div></div>`;
+    for (let d = 1; d <= 30; d++) {
+      const cls = marks[d] ? `cds ${marks[d]}` : "";
+      cells += `<div class="d ${cls}">${d}</div>`;
+    }
+    const rows = [
+      ["Wed, 30 Sep", "Checked in 1:21 PM · No. 12", '<span class="chip ok">Cleared</span>'],
+      ["Wed, 23 Sep", "Checked in 1:47 PM · No. 38", '<span class="chip ok">Cleared</span>'],
+      ["Wed, 16 Sep", "Health excuse · approved by Exco", '<span class="chip plain">Excused</span>'],
+      ["Wed, 9 Sep", "Checked in 3:41 PM · No. 61", '<span class="chip warn">Late</span>'],
+      ["Wed, 2 Sep", "Checked in 1:33 PM · No. 24", '<span class="chip ok">Cleared</span>']
+    ];
+    return `<section><div class="sec-head"><h2>Attendance history</h2><span class="chip plain">September 2026</span></div>
+      <div class="stack">
+        <div class="stats">
+          <div class="card stat"><b>4/5</b><span>Meetings</span></div>
+          <div class="card stat"><b>1</b><span>Late</span></div>
+          <div class="card stat"><b>0</b><span>Absent</span></div>
+        </div>
+        <div class="card pad"><div class="cal">${cells}</div>
+          <div class="legend"><span class="chip ok">Cleared</span><span class="chip warn">Late</span><span class="chip plain">Excused</span><span class="chip bad">Absent</span></div>
+        </div>
+        <div class="card list">${rows.map(r => `<div><div>${r[0]}<small>${r[1]}</small></div>${r[2]}</div>`).join("")}</div>
+        <button class="btn block" type="button" data-act="excuse">Can't make a meeting? Send an excuse</button>
+      </div></section>`;
+  }
+
+  /* ---------- Games ---------- */
+  function games() {
+    return `<section><div class="sec-head"><h2>Games</h2></div><div class="stack">
+      <div class="card pad points"><div><p class="label">Your points</p><b>240</b></div><span class="chip ok">#14 in Ikeja</span></div>
+      <button class="card game" type="button" data-act="soon" style="text-align:left;border-color:var(--border)"><span class="gi">NAP</span><div><b>Name, Animal, Place</b><span class="small muted">Race to fill Name, Animal, Place, Food and Thing before anyone else. 2–8 players.</span></div><span class="chip ok">3 rooms</span></button>
+      <button class="card game" type="button" data-act="soon" style="text-align:left;border-color:var(--border)"><span class="gi">X&amp;O</span><div><b>X &amp; O</b><span class="small muted">Classic, free-for-all or team mode. Make lines to score.</span></div><span class="chip plain">1 room</span></button>
+      <div class="card list">
+        <div><div><b>Room “ICT Lunch Break”</b><small>Name, Animal, Place · 4 of 8 players</small></div><button class="btn" type="button" data-act="soon">Join</button></div>
+        <div><div><b>Room “Annex B corner”</b><small>X &amp; O · Team mode · 6 of 8 players</small></div><button class="btn" type="button" data-act="soon">Join</button></div>
+      </div>
+    </div></section>`;
+  }
+
+  /* ---------- Notifications ---------- */
+  function alerts() {
+    const items = [
+      ["called", "Number range 31–45 called", "Weekly CDS Meeting · 2:18 PM"],
+      ["ok", "Excuse approved", "Your health excuse for Wed, 16 Sep was approved by the ICT Exco."],
+      ["plain", "New event: Weekly CDS Meeting", "Every Wednesday · 1:00 PM · LGA Secretariat"],
+      ["plain", "You won an X & O round", "+10 points · Room “Annex B corner”"]
+    ];
+    return `<section><div class="sec-head"><h2>Notifications</h2><span class="small muted">Cleared after 7 days</span></div>
+      <div class="card list">${items.map(i => `<div><div><b>${i[1]}</b><small>${i[2]}</small></div>${i[0] === "called" ? '<span class="chip warn">Called</span>' : i[0] === "ok" ? '<span class="chip ok">Approved</span>' : ""}</div>`).join("")}</div></section>`;
+  }
+
+  /* ---------- Settings ---------- */
+  function settings() {
+    return `<section><div class="sec-head"><h2>Settings</h2></div><div class="stack">
+      <div class="card set">
+        <div><div><b>Push notifications</b><p class="small muted">Get notified when your number range is called</p></div><input class="toggle" type="checkbox" id="setPush" ${S.push ? "checked" : ""} aria-label="Push notifications"></div>
+      </div>
+      <div class="card set">
+        <div><div><b>Profile</b><p class="small muted">${esc(D.name)} · <span class="mono">${esc(D.code)}</span></p></div><button class="btn" type="button" data-act="edit">Edit</button></div>
+        <div><div><b>Sign-in method</b><p class="small muted">Passkey on this device</p></div><span class="chip ok">Secured</span></div>
+        <div><div><b>My reports</b><p class="small muted">1 personal excuse left this month</p></div><button class="btn" type="button" data-act="excuse">Open</button></div>
+      </div>
+      <div class="card set"><div><div><b style="color:var(--danger)">Delete account</b><p class="small muted">Removes your profile and attendance history</p></div><button class="btn" type="button" data-act="soon" style="color:var(--danger)">Delete</button></div></div>
+    </div></section>`;
+  }
+
+  /* ---------- Sheets ---------- */
+  function openSheet(html) {
+    $("#sheetRoot").innerHTML = `<div class="scrim" data-act="close"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`;
+    const first = $("#sheetRoot button, #sheetRoot input, #sheetRoot select"); if (first) first.focus();
+  }
+  function closeSheet() { $("#sheetRoot").innerHTML = ""; }
+  function communitySheet() {
+    S.seenAlerts = true; renderChrome();
+    openSheet(`<div class="grab"></div>
+      <div class="sheet-head"><h3>Community updates</h3><button class="icon-btn" type="button" data-act="close" aria-label="Close">${I.x}</button></div>
+      <p class="small muted" style="margin-top:-8px">Issues shared by corps members and Excos in Ikeja LGA</p>
+      ${S.alerts.map((a, i) => `<div class="alert-item">
+        <div class="top"><span class="chip ${a.hot ? "bad" : "plain"}">${a.hot ? "High priority" : esc(a.tag)}</span><span class="small muted">${a.ago}</span></div>
+        <b>${esc(a.title)}</b><p class="muted">${esc(a.text)}</p>
+        <div class="top"><span class="small muted">${esc(a.by)}</span><button class="up" type="button" data-up="${i}" aria-pressed="${a.mine}">▲ ${a.up + (a.mine ? 1 : 0)} affected</button></div>
+      </div>`).join("")}
+      <button class="btn block" type="button" data-act="excuse">Report an issue</button>`);
+  }
+  function excuseSheet() {
+    openSheet(`<div class="grab"></div>
+      <div class="sheet-head"><h3>Send a report</h3><button class="icon-btn" type="button" data-act="close" aria-label="Close">${I.x}</button></div>
+      <form id="exForm" class="stack" novalidate>
+        <div class="field"><label for="exType">Type</label><select id="exType"><option>Personal excuse (1 left this month)</option><option>Public issue (venue, traffic)</option><option>Record correction</option></select></div>
+        <div class="field"><label for="exDate">Meeting</label><select id="exDate"><option>Wed, 14 Oct</option><option>Wed, 21 Oct</option><option>Wed, 28 Oct</option></select></div>
+        <div class="field"><label for="exText">What happened</label><textarea id="exText">I have a follow-up appointment at General Hospital Ikeja on the afternoon of the meeting.</textarea></div>
+        <div class="field"><label for="exFile">Evidence (image or PDF, up to 5 MB)</label><input id="exFile" type="file" accept="image/*,.pdf"></div>
+        <p class="small" id="exErr" role="alert" hidden style="color:var(--danger)"></p>
+        <button class="btn primary block" type="submit">Send to Exco</button>
+      </form>`);
+  }
+
+  function editSheet() {
+    const f = (id, label, val, extra = "") => `<div class="field"><label for="${id}">${label}</label><input id="${id}" value="${esc(val)}" ${extra}></div>`;
+    openSheet(`<div class="grab"></div>
+      <div class="sheet-head"><h3>Edit home screen</h3><button class="icon-btn" type="button" data-act="close" aria-label="Close">${I.x}</button></div>
+      <form id="editForm" class="stack" novalidate>
+        ${f("dName", "Name", D.name, 'autocomplete="off"')}
+        ${f("dCode", "State code", D.code, 'autocomplete="off" placeholder="LA/26B/2941"')}
+        <div class="row2" style="margin-top:0">${f("dNum", "Check-in number", D.num, 'inputmode="numeric"')}${f("dTime", "Check-in time", D.checkinAt, 'placeholder="08:17"')}</div>
+        ${f("dEvent", "Event name", D.event)}
+        ${f("dHours", "Event time", D.time)}
+        ${f("dAddr", "Venue address", D.address)}
+        ${f("dStatus", "Status badge", D.status)}
+        <button class="btn primary block" type="submit">Save changes</button>
+        <button class="btn block" type="button" data-act="resetDetails">Reset to original</button>
+      </form>`);
+  }
+
+  /* ---------- Render ---------- */
+  function renderChrome() {
+    $$(".nav button").forEach(b => b.dataset.tab === S.tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
+    $("#notifDot").hidden = S.notifsRead;
+    $("#fabBadge").hidden = S.seenAlerts;
+    $("#fab").setAttribute("aria-label", S.seenAlerts ? "Community updates" : "Community updates, 5 new");
+    const demoKey = S.stage === "checking" ? "open" : S.stage;
+    $$("[data-demo]").forEach(b => b.setAttribute("aria-pressed", b.dataset.demo === demoKey));
+  }
+  function render() {
+    const v = { home, history, games, alerts, settings }[S.tab]();
+    $("#view").innerHTML = v;
+    const q = $("#qr"); if (q) drawCode(q, D.code + D.num);
+    $("#hName").textContent = D.name; $("#hCode").textContent = D.code;
+    renderChrome();
+  }
+
+  function checkin() {
+    S.stage = "checking"; render();
+    [0, 1, 2].forEach(i => {
+      setTimeout(() => $(`.step[data-s="${i}"]`)?.classList.add("run"), i * 750);
+      setTimeout(() => { const el = $(`.step[data-s="${i}"]`); el?.classList.remove("run"); el?.classList.add("done"); }, i * 750 + 700);
+    });
+    setTimeout(() => { S.stage = "waiting"; S.checkinAt = "08:17"; render(); toast("Checked in", `You're number ${S.num}. We'll notify you when it's called.`); }, 2400);
+  }
+
+  /* ---------- Events ---------- */
+  document.addEventListener("click", e => {
+    const t = e.target.closest("button, .scrim, [data-act=\"edit\"]");
+    if (!t) return;
+    if (t.classList.contains("scrim") && e.target !== t) return;
+    if (t.dataset.tab) { S.tab = t.dataset.tab; if (S.tab === "alerts") S.notifsRead = true; render(); scrollTo({ top: 0 }); return; }
+    if (t.dataset.demo) {
+      S.tab = "home";
+      S.stage = t.dataset.demo;
+      S.clearing = ["called", "cleared"].includes(t.dataset.demo) ? { from: 701, to: 750 } : { from: 651, to: 700 };
+      render();
+      if (S.stage === "called") toast("Your number has been called", "Numbers 701–750. Go to the clearance desk now.");
+      return;
+    }
+    if (t.dataset.up) { const a = S.alerts[+t.dataset.up]; a.mine = !a.mine; t.setAttribute("aria-pressed", a.mine); t.textContent = `▲ ${a.up + (a.mine ? 1 : 0)} affected`; return; }
+    if (t === $("#fab")) return communitySheet();
+    const act = t.dataset.act;
+    if (act === "close") return closeSheet();
+    if (act === "edit") return editSheet();
+    if (act === "resetDetails") { Object.assign(D, DEFAULTS); saveD(); closeSheet(); render(); toast("Details reset", "Back to the original text."); return; }
+    if (act === "checkin") return checkin();
+    if (act === "excuse") return excuseSheet();
+    if (act === "soon") return toast("Not in this preview", "This screen works in the full app.");
+    if (act === "refresh") { t.classList.remove("spin"); void t.offsetWidth; t.classList.add("spin"); toast("Up to date", "Events refreshed just now."); return; }
+  });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); if ((e.key === "Enter" || e.key === " ") && e.target.id === "hName") { e.preventDefault(); editSheet(); } });
+  document.addEventListener("submit", e => {
+    e.preventDefault();
+    if (e.target.id === "editForm") {
+      const v = id => $("#" + id).value.trim();
+      Object.assign(D, { name: v("dName") || DEFAULTS.name, code: v("dCode") || DEFAULTS.code, num: v("dNum").replace(/^#/, "") || DEFAULTS.num, checkinAt: v("dTime") || DEFAULTS.checkinAt, event: v("dEvent") || DEFAULTS.event, time: v("dHours") || DEFAULTS.time, address: v("dAddr") || DEFAULTS.address, status: v("dStatus") || DEFAULTS.status });
+      saveD(); closeSheet(); render(); toast("Saved", "Your home screen is updated."); return;
+    }
+    if (e.target.id !== "exForm") return;
+    const txt = $("#exText").value.trim();
+    if (txt.length < 10) { const er = $("#exErr"); er.textContent = "Add a short explanation (at least 10 characters) so your Exco can review it."; er.hidden = false; return; }
+    closeSheet(); toast("Report sent", "Your Exco will review it. You'll get a notification with the decision.");
+  });
+  document.addEventListener("change", e => {
+    if (e.target.id === "setPush") { S.push = e.target.checked; toast(S.push ? "Notifications on" : "Notifications off", S.push ? "We'll alert you when your range is called." : "You'll need to watch the screen for your number."); }
+  });
+
+  $("#datePill").textContent = TODAY_LONG;
+  const h = new Date().getHours();
+  $("#greet").textContent = h < 12 ? "Good morning," : h < 17 ? "Good afternoon," : "Good evening,";
+  render();
+})();
+</script>
+</body>
+</html>
